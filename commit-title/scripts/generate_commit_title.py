@@ -8,7 +8,7 @@ import sys
 from typing import List
 
 
-DEFAULT_MODEL = "gpt-5.1-codex-mini"
+DEFAULT_MODEL = "gpt-5.4-mini"
 DEFAULT_MAX_LEN = 72
 
 
@@ -53,6 +53,29 @@ def get_changes(staged: bool, include_patch: bool, patch_lines: int) -> str:
             parts.append("Patch:\n" + patch)
 
     return "\n\n".join(parts).strip()
+
+
+def get_best_changes(use_unstaged: bool, include_patch: bool, patch_lines: int) -> str:
+    if use_unstaged:
+        return get_changes(
+            staged=False,
+            include_patch=include_patch,
+            patch_lines=patch_lines,
+        )
+
+    staged_changes = get_changes(
+        staged=True,
+        include_patch=include_patch,
+        patch_lines=patch_lines,
+    )
+    if staged_changes:
+        return staged_changes
+
+    return get_changes(
+        staged=False,
+        include_patch=include_patch,
+        patch_lines=patch_lines,
+    )
 
 
 def build_prompt(history: List[str], changes: str, max_len: int) -> str:
@@ -178,14 +201,14 @@ def main() -> int:
         return 2
 
     history = get_history(args.history_limit)
-    changes = get_changes(
-        staged=not args.unstaged,
+    changes = get_best_changes(
+        use_unstaged=args.unstaged,
         include_patch=args.include_patch,
         patch_lines=args.patch_lines,
     )
 
     if not changes:
-        print("error: no changes found in selected diff scope", file=sys.stderr)
+        print("error: no staged or unstaged changes found", file=sys.stderr)
         return 2
 
     prompt = build_prompt(history, changes, args.max_len)
